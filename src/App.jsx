@@ -65,6 +65,7 @@ export default function ElPermitido() {
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
   const checkingRef = useRef(false);
+  const matchVersionRef = useRef(0);
 
   useEffect(() => {
     const votosRef = ref(db, "votos");
@@ -87,7 +88,8 @@ export default function ElPermitido() {
   useEffect(() => {
     if (votos.timo && votos.gabi && !result && !checkingRef.current) {
       checkingRef.current = true;
-      checkMatch(votos.timo, votos.gabi);
+      const version = ++matchVersionRef.current;
+      checkMatch(votos.timo, votos.gabi, version);
     }
   }, [votos, result]);
 
@@ -105,7 +107,7 @@ export default function ElPermitido() {
     setInput("");
   }
 
-  async function checkMatch(v1, v2) {
+  async function checkMatch(v1, v2, version) {
     setChecking(true);
     setError("");
     try {
@@ -137,6 +139,7 @@ Respondé SOLO con JSON sin markdown:
       if (data.error) throw new Error(data.error.message);
       const text = data.content?.[0]?.text?.replace(/```json|```/g,"").trim() || "";
       const parsed = JSON.parse(text);
+      if (matchVersionRef.current !== version) return;
       await set(ref(db, "result"), { match: parsed.coincidencia, reason: parsed.razon, voto1: v1, voto2: v2 });
     } catch(e) {
       setError("Error consultando la IA: " + e.message);
@@ -155,6 +158,7 @@ Respondé SOLO con JSON sin markdown:
 
   async function clearVote() {
     try {
+      matchVersionRef.current++;
       await set(ref(db, "votos"), { ...votos, [who]: null });
       await set(ref(db, "result"), null);
       checkingRef.current = false;
@@ -166,6 +170,7 @@ Respondé SOLO con JSON sin markdown:
 
   async function fullReset() {
     try {
+      matchVersionRef.current++;
       await set(ref(db, "votos"), { timo: null, gabi: null });
       await set(ref(db, "result"), null);
       checkingRef.current = false;
