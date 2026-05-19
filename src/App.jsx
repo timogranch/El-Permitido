@@ -58,7 +58,7 @@ const muted = "#8a7a68";
 const globalStyle = `*{box-sizing:border-box;margin:0;padding:0}::placeholder{color:#5a4e42}textarea:focus{outline:none;border-color:${gold}!important}button:active{transform:scale(0.97)}`;
 
 export default function ElPermitido() {
-  const [who, setWho] = useState(() => localStorage.getItem("elpermitido_who") || null);
+  const [who, setWho] = useState(null);
   const [votos, setVotos] = useState({ timo: null, gabi: null });
   const [result, setResult] = useState(null);
   const [checking, setChecking] = useState(false);
@@ -95,13 +95,11 @@ export default function ElPermitido() {
 
   function selectIdentity(id) {
     setWho(id);
-    localStorage.setItem("elpermitido_who", id);
     setError("");
     setInput("");
   }
 
   function changeIdentity() {
-    localStorage.removeItem("elpermitido_who");
     setWho(null);
     setError("");
     setInput("");
