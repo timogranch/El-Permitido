@@ -156,19 +156,27 @@ Respondé SOLO con JSON sin markdown:
   }
 
   async function clearVote() {
-    const newVotos = { ...votos, [who]: null };
-    await set(ref(db, "votos"), newVotos);
-    await set(ref(db, "result"), null);
-    checkingRef.current = false;
-    setError("");
+    try {
+      const newVotos = { ...votos, [who]: null };
+      await set(ref(db, "votos"), newVotos);
+      await set(ref(db, "result"), null);
+      checkingRef.current = false;
+      setError("");
+    } catch(e) {
+      setError("Error al limpiar voto: " + e.message);
+    }
   }
 
   async function fullReset() {
-    await set(ref(db, "votos"), { timo: null, gabi: null });
-    await set(ref(db, "result"), null);
-    checkingRef.current = false;
-    setError("");
-    setInput("");
+    try {
+      await set(ref(db, "votos"), { timo: null, gabi: null });
+      await set(ref(db, "result"), null);
+      checkingRef.current = false;
+      setError("");
+      setInput("");
+    } catch(e) {
+      setError("Error al resetear: " + e.message);
+    }
   }
 
   return (
