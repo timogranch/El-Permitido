@@ -56,7 +56,7 @@ const cream = "#f5ead8";
 const muted = "#8a7a68";
 
 export default function ElPermitido() {
-  const [who, setWho] = useState("timo");
+  const [who, setWho] = useState(() => localStorage.getItem("elpermitido_who") || "timo");
   const [votos, setVotos] = useState({ timo: null, gabi: null });
   const [result, setResult] = useState(null);
   const [checking, setChecking] = useState(false);
@@ -69,7 +69,7 @@ export default function ElPermitido() {
     const votosRef = ref(db, "votos");
     const unsub = onValue(votosRef, (snapshot) => {
       const data = snapshot.val();
-      if (data) setVotos(data);
+      setVotos(data || { timo: null, gabi: null });
     });
     return () => unsub();
   }, []);
@@ -90,6 +90,13 @@ export default function ElPermitido() {
   const otherVote = votos[otherWho];
   const otherLabel = otherWho === "timo" ? "Timo" : "Gabi";
   const selectorLocked = !!myVote;
+
+  // Si es primera visita y timo ya votó pero gabi no, auto-seleccionar gabi
+  useEffect(() => {
+    if (!localStorage.getItem("elpermitido_who") && votos.timo && !votos.gabi) {
+      setWho("gabi");
+    }
+  }, [votos.timo, votos.gabi]);
 
   useEffect(() => {
     if (votos.timo && votos.gabi && !result && !checkingRef.current) {
@@ -187,7 +194,7 @@ Respondé SOLO con JSON sin markdown:
           pointerEvents: selectorLocked ? "none" : "auto",
         }}>
           {[["timo","Soy Timo"],["gabi","Soy Gabi"]].map(([id, label]) => (
-            <button key={id} onClick={() => { setWho(id); setError(""); setInput(""); }} style={{
+            <button key={id} onClick={() => { setWho(id); localStorage.setItem("elpermitido_who", id); setError(""); setInput(""); }} style={{
               flex:1, padding:"10px 0",
               background: who===id ? gold : "transparent",
               color: who===id ? "#1a1510" : muted,
