@@ -55,8 +55,10 @@ const goldLight = "#e8c76a";
 const cream = "#f5ead8";
 const muted = "#8a7a68";
 
+const globalStyle = `*{box-sizing:border-box;margin:0;padding:0}::placeholder{color:#5a4e42}textarea:focus{outline:none;border-color:${gold}!important}button:active{transform:scale(0.97)}`;
+
 export default function ElPermitido() {
-  const [who, setWho] = useState(() => localStorage.getItem("elpermitido_who") || "timo");
+  const [who, setWho] = useState(() => localStorage.getItem("elpermitido_who") || null);
   const [votos, setVotos] = useState({ timo: null, gabi: null });
   const [result, setResult] = useState(null);
   const [checking, setChecking] = useState(false);
@@ -64,17 +66,14 @@ export default function ElPermitido() {
   const [error, setError] = useState("");
   const checkingRef = useRef(false);
 
-  // Sync votos from Firebase in real time
   useEffect(() => {
     const votosRef = ref(db, "votos");
     const unsub = onValue(votosRef, (snapshot) => {
-      const data = snapshot.val();
-      setVotos(data || { timo: null, gabi: null });
+      setVotos(snapshot.val() || { timo: null, gabi: null });
     });
     return () => unsub();
   }, []);
 
-  // Sync result from Firebase in real time
   useEffect(() => {
     const resultRef = ref(db, "result");
     const unsub = onValue(resultRef, (snapshot) => {
@@ -85,25 +84,26 @@ export default function ElPermitido() {
     return () => unsub();
   }, []);
 
-  const myVote = votos[who];
-  const otherWho = who === "timo" ? "gabi" : "timo";
-  const otherVote = votos[otherWho];
-  const otherLabel = otherWho === "timo" ? "Timo" : "Gabi";
-  const selectorLocked = !!myVote;
-
-  // Si es primera visita y timo ya votó pero gabi no, auto-seleccionar gabi
-  useEffect(() => {
-    if (!localStorage.getItem("elpermitido_who") && votos.timo && !votos.gabi) {
-      setWho("gabi");
-    }
-  }, [votos.timo, votos.gabi]);
-
   useEffect(() => {
     if (votos.timo && votos.gabi && !result && !checkingRef.current) {
       checkingRef.current = true;
       checkMatch(votos.timo, votos.gabi);
     }
   }, [votos, result]);
+
+  function selectIdentity(id) {
+    setWho(id);
+    localStorage.setItem("elpermitido_who", id);
+    setError("");
+    setInput("");
+  }
+
+  function changeIdentity() {
+    localStorage.removeItem("elpermitido_who");
+    setWho(null);
+    setError("");
+    setInput("");
+  }
 
   async function checkMatch(v1, v2) {
     setChecking(true);
@@ -137,8 +137,7 @@ Respondé SOLO con JSON sin markdown:
       if (data.error) throw new Error(data.error.message);
       const text = data.content?.[0]?.text?.replace(/```json|```/g,"").trim() || "";
       const parsed = JSON.parse(text);
-      const resultData = { match: parsed.coincidencia, reason: parsed.razon, voto1: v1, voto2: v2 };
-      await set(ref(db, "result"), resultData);
+      await set(ref(db, "result"), { match: parsed.coincidencia, reason: parsed.razon, voto1: v1, voto2: v2 });
     } catch(e) {
       setError("Error consultando la IA: " + e.message);
       checkingRef.current = false;
@@ -150,15 +149,13 @@ Respondé SOLO con JSON sin markdown:
     const val = input.trim();
     if (!val) { setError("Escribí qué querés comer."); return; }
     setError("");
-    const newVotos = { ...votos, [who]: val };
-    await set(ref(db, "votos"), newVotos);
+    await set(ref(db, "votos"), { ...votos, [who]: val });
     setInput("");
   }
 
   async function clearVote() {
     try {
-      const newVotos = { ...votos, [who]: null };
-      await set(ref(db, "votos"), newVotos);
+      await set(ref(db, "votos"), { ...votos, [who]: null });
       await set(ref(db, "result"), null);
       checkingRef.current = false;
       setError("");
@@ -179,9 +176,47 @@ Respondé SOLO con JSON sin markdown:
     }
   }
 
+  // Pantalla 1: elegir identidad
+  if (!who) {
+    return (
+      <div style={{ fontFamily:"Georgia,'Times New Roman',serif", background:bg, minHeight:"100vh", color:cream, display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <style>{globalStyle}</style>
+        <div style={{ maxWidth:380, width:"100%", padding:"2rem 1.5rem", textAlign:"center" }}>
+          <h1 style={{ fontSize:42, fontWeight:"normal", color:cream, letterSpacing:"0.05em", marginBottom:8 }}>
+            El Permitido
+          </h1>
+          <p style={{ fontSize:13, color:muted, marginBottom:"3.5rem", fontStyle:"italic" }}>
+            Si coinciden, se lo merecen
+          </p>
+          <p style={{ fontSize:14, color:muted, marginBottom:"1.25rem" }}>¿Quién sos?</p>
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            <button onClick={() => selectIdentity("timo")} style={{
+              padding:18, background:gold, color:"#1a1510",
+              border:"none", borderRadius:12, fontSize:18,
+              fontFamily:"Georgia,serif", cursor:"pointer", fontWeight:600,
+              letterSpacing:"0.03em",
+            }}>Soy Timo</button>
+            <button onClick={() => selectIdentity("gabi")} style={{
+              padding:18, background:"transparent", color:cream,
+              border:`1.5px solid ${border}`, borderRadius:12, fontSize:18,
+              fontFamily:"Georgia,serif", cursor:"pointer",
+            }}>Soy Gabi</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Pantalla 2: votar
+  const myVote = votos[who];
+  const otherWho = who === "timo" ? "gabi" : "timo";
+  const otherVote = votos[otherWho];
+  const otherLabel = otherWho === "timo" ? "Timo" : "Gabi";
+  const myLabel = who === "timo" ? "Timo" : "Gabi";
+
   return (
     <div style={{ fontFamily:"Georgia,'Times New Roman',serif", background:bg, minHeight:"100vh", color:cream }}>
-      <style>{`*{box-sizing:border-box;margin:0;padding:0}::placeholder{color:#5a4e42}textarea:focus{outline:none;border-color:${gold}!important}button:active{transform:scale(0.97)}`}</style>
+      <style>{globalStyle}</style>
 
       <div style={{ maxWidth:400, margin:"0 auto", padding:"1.5rem 1rem 3rem" }}>
 
@@ -192,33 +227,15 @@ Respondé SOLO con JSON sin markdown:
           <p style={{ fontSize:13, color:muted, marginTop:6, fontStyle:"italic" }}>
             Si coinciden, se lo merecen
           </p>
-        </div>
-
-        <div style={{
-          display:"flex", gap:8, marginBottom:"0.75rem",
-          background:card, borderRadius:10, padding:4,
-          border:`0.5px solid ${border}`,
-          opacity: selectorLocked ? 0.45 : 1,
-          pointerEvents: selectorLocked ? "none" : "auto",
-        }}>
-          {[["timo","Soy Timo"],["gabi","Soy Gabi"]].map(([id, label]) => (
-            <button key={id} onClick={() => { setWho(id); localStorage.setItem("elpermitido_who", id); setError(""); setInput(""); }} style={{
-              flex:1, padding:"10px 0",
-              background: who===id ? gold : "transparent",
-              color: who===id ? "#1a1510" : muted,
-              border:"none", borderRadius:7,
-              fontSize:14, fontFamily:"inherit",
-              cursor:"pointer", fontWeight: who===id ? 600 : 400,
-              transition:"all 0.2s",
-            }}>{label}</button>
-          ))}
-        </div>
-
-        {selectorLocked && (
-          <p style={{ fontSize:11, color:muted, textAlign:"center", marginBottom:"1rem", fontStyle:"italic" }}>
-            Ya votaste — esperá que el otro cargue su pedido
+          <p style={{ fontSize:12, color:muted, marginTop:10 }}>
+            Hola, <strong style={{ color:goldLight }}>{myLabel}</strong>
+            {" · "}
+            <button onClick={changeIdentity} style={{
+              background:"none", border:"none", color:muted, fontSize:12,
+              cursor:"pointer", textDecoration:"underline", fontFamily:"inherit", padding:0,
+            }}>No soy yo</button>
           </p>
-        )}
+        </div>
 
         <div style={{ background:card, border:`0.5px solid ${border}`, borderRadius:10, padding:"12px 16px", marginBottom:"1.5rem" }}>
           {[["timo","Timo"],["gabi","Gabi"]].map(([id, label]) => (
@@ -231,7 +248,7 @@ Respondé SOLO con JSON sin markdown:
                   boxShadow: votos[id] ? "0 0 5px #4ade8077" : "none",
                 }}/>
                 <span style={{ color: votos[id] ? "#4ade80" : "#f59e0b" }}>
-                  {votos[id] ? "Ya votó" : "Esperando..."}
+                  {votos[id] ? "Ya eligió" : "Esperando..."}
                 </span>
               </span>
             </div>
@@ -277,18 +294,16 @@ Respondé SOLO con JSON sin markdown:
           </div>
 
         ) : myVote ? (
-          <div style={{ background:card, border:`0.5px solid ${border}`, borderRadius:14, padding:"1.5rem", textAlign:"center" }}>
-            <p style={{ fontSize:12, color:muted, marginBottom:8 }}>Tu pedido de hoy:</p>
-            <div style={{ fontSize:16, color:goldLight, fontStyle:"italic", padding:"10px 16px", background:bg, borderRadius:8, border:`0.5px solid ${border}`, marginBottom:14 }}>
-              "{myVote}"
-            </div>
+          <div style={{ background:card, border:`0.5px solid ${border}`, borderRadius:14, padding:"2rem 1.5rem", textAlign:"center" }}>
+            <div style={{ fontSize:40, marginBottom:14 }}>🤫</div>
+            <p style={{ fontSize:16, color:cream, marginBottom:8 }}>Ya elegiste tu plato</p>
             <p style={{ fontSize:13, color: otherVote ? "#4ade80" : "#f59e0b" }}>
               {otherVote
-                ? `${otherLabel} también cargó. Analizando...`
-                : `Esperando que ${otherLabel} cargue su pedido...`}
+                ? `${otherLabel} también eligió. Analizando...`
+                : `Esperando a ${otherLabel}...`}
             </p>
             <button onClick={clearVote} style={{
-              marginTop:14, padding:"7px 18px", background:"transparent",
+              marginTop:16, padding:"7px 18px", background:"transparent",
               border:`0.5px solid ${border}`, borderRadius:6, color:muted,
               fontSize:12, fontFamily:"inherit", cursor:"pointer",
             }}>Cambiar mi pedido</button>
