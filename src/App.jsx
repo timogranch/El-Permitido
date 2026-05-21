@@ -293,9 +293,6 @@ Respondé SOLO con JSON sin markdown:
         <TopBar />
 
         <div style={{ marginTop: 2, flexShrink: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 500, color: C.coral, letterSpacing: '0.08em', marginBottom: 8, textTransform: 'uppercase' }}>
-            Ritual de hoy
-          </div>
           <h1 style={{ margin: 0, fontWeight: 500, fontSize: 32, lineHeight: 1.05, letterSpacing: '-0.035em', color: C.ink }}>
             Antes de pedir,<br />
             <span style={{ fontStyle: 'italic', fontWeight: 400, color: C.coral }}>¿quién sos?</span>
